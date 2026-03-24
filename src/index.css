@@ -1,0 +1,29 @@
+/* 1. Load the Tailwind CSS Engine */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 2. Custom TV Animations */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. A pure black background fallback for the TV */
+body {
+  background-color: #111827; 
+  margin: 0;
+  padding: 0;
+}
