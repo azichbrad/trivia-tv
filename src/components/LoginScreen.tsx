@@ -9,11 +9,21 @@ export default function LoginScreen() {
 
   const handleOAuthLogin = async () => {
     setErrorMessage('');
+    
+    // Check if we are testing on our computer or live on the internet
+    const isLocal = window.location.hostname === 'localhost';
+    
+    // Hardcode the exact URLs for the TV app to prevent Supabase confusion
+    // (Note: Change 5175 to whatever local port Vite is using for your TV app!)
+    const redirectUrl = isLocal 
+      ? 'http://localhost:5175/' 
+      : 'https://trivia-tv.vercel.app/';
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      // This tells Google to send them right back to wherever the TV app is currently running
-      options: { redirectTo: window.location.origin + '/' } 
+      options: { redirectTo: redirectUrl } 
     });
+    
     if (error) setErrorMessage(error.message);
   };
 
