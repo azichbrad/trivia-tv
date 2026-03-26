@@ -1,100 +1,89 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { supabase } from './supabaseClient';
 
-const socket = io('https://trivia-api-z36k.onrender.com');
-const NEWPORT_BAR_ID = '11111111-1111-1111-1111-111111111111';
+// Import our new components
+import LoginScreen from './components/LoginScreen';
+import TvLobby from './components/TvLobby';
+import QuestionView from './components/QuestionView';
+import Leaderboard from './components/Leaderboard';
 
-interface PlayerScore {
-  name: string;
-  score: number;
-}
+const socket = io('https://trivia-api-z36k.onrender.com'); 
 
 function App() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [screen, setScreen] = useState<'idle' | 'question' | 'leaderboard'>('idle');
+  const [session, setSession] = useState<any>(null);
+  const [venueData, setVenueData] = useState<any>(null);
+  const [screen, setScreen] = useState<'lobby' | 'question' | 'leaderboard' | 'final'>('lobby');
+  
+  // Game State
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
-  const [leaderboard, setLeaderboard] = useState<PlayerScore[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
 
   useEffect(() => {
-    socket.on('connect', () => {
-      setIsConnected(true);
-      socket.emit('join_bar', NEWPORT_BAR_ID);
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
+    supabase.auth.onAuthStateChange((_event, session) => handleSession(session));
 
-    socket.on('disconnect', () => setIsConnected(false));
-
+    // Socket Listeners
     socket.on('NEW_QUESTION', (data) => {
       setCurrentQuestion(data);
       setScreen('question');
     });
 
-    // THE UPGRADE: The TV now unpacks the object to find the leaderboard array
-    socket.on('SHOW_LEADERBOARD', (data: { leaderboard: PlayerScore[], correctAnswer: string }) => {
+    socket.on('SHOW_LEADERBOARD', (data) => {
       setLeaderboard(data.leaderboard);
+      setCorrectAnswer(data.correctAnswer);
       setScreen('leaderboard');
     });
 
-    socket.on('GAME_OVER', () => {
-      setScreen('idle');
-      setLeaderboard([]); 
+    socket.on('GAME_OVER', (data) => {
+      setLeaderboard(data.leaderboard);
+      setScreen('final');
     });
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
       socket.off('NEW_QUESTION');
       socket.off('SHOW_LEADERBOARD');
       socket.off('GAME_OVER');
     };
   }, []);
 
+  const handleSession = (session: any) => {
+    setSession(session);
+    if (session) {
+      setVenueData({
+        userId: session.user.id,
+        barName: session.user.user_metadata?.barName || 'Trivia Night'
+      });
+      socket.emit('host_connect', { barId: session.user.id });
+      setScreen('lobby');
+    }
+  };
+
+  if (!session) return <LoginScreen />;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8 font-sans">
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-        <span className="text-sm font-semibold text-gray-400">{isConnected ? 'TV Connected' : 'Offline'}</span>
-      </div>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans overflow-hidden">
+      
+      {/* HEADER */}
+      <header className="p-8 flex justify-between items-center border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-sm z-10">
+        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tight">
+          {venueData?.barName}
+        </h1>
+        <div className="flex items-center gap-3 bg-zinc-900/80 px-4 py-2 rounded-full border border-zinc-800">
+          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="text-sm font-bold text-zinc-300 tracking-widest uppercase">Live Broadcast</span>
+        </div>
+      </header>
 
-      <div className="w-full max-w-4xl flex-grow flex flex-col items-center justify-center text-center">
-        {screen === 'idle' && (
-          <div className="animate-fade-in">
-            <h1 className="text-6xl font-black tracking-tighter text-blue-500 mb-4">NEWPORT SPORTS TAVERN</h1>
-            <p className="text-2xl text-gray-400 font-light">Live Trivia starting soon...</p>
-          </div>
-        )}
-
-        {screen === 'question' && currentQuestion && (
-          <div className="w-full animate-fade-in bg-gray-800 p-12 rounded-3xl shadow-2xl border border-gray-700">
-            <h2 className="text-5xl font-bold mb-12 leading-tight">{currentQuestion.questionText}</h2>
-            <div className="grid grid-cols-2 gap-6 w-full max-w-3xl mx-auto">
-              {currentQuestion.answers.map((answer: string, index: number) => (
-                <div key={index} className="bg-blue-600 rounded-xl p-6 text-2xl font-semibold shadow-lg">{answer}</div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {screen === 'leaderboard' && (
-          <div className="w-full max-w-2xl animate-fade-in bg-gray-800 p-12 rounded-3xl shadow-2xl border border-blue-500/30">
-            <h2 className="text-5xl font-black text-blue-400 mb-8 tracking-wide">TOP 5 PLAYERS</h2>
-            {leaderboard.length === 0 ? (
-              <p className="text-2xl text-gray-400">Nobody scored points this round!</p>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {leaderboard.map((player, index) => (
-                  <div key={index} className="flex justify-between items-center bg-gray-900 p-6 rounded-xl border border-gray-700">
-                    <div className="flex items-center gap-6">
-                      <span className="text-3xl font-black text-gray-500">#{index + 1}</span>
-                      <span className="text-3xl font-bold">{player.name}</span>
-                    </div>
-                    <span className="text-3xl font-black text-green-400">{player.score.toLocaleString()} pts</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* DYNAMIC SCREENS ROUTER */}
+      <main className="flex-grow flex items-center justify-center p-8 relative">
+        {screen === 'lobby' && <TvLobby venueData={venueData} />}
+        {screen === 'question' && <QuestionView question={currentQuestion} />}
+        {screen === 'leaderboard' && <Leaderboard leaderboard={leaderboard} correctAnswer={correctAnswer} />}
+        {screen === 'final' && <Leaderboard leaderboard={leaderboard} isFinal={true} />}
+      </main>
+      
     </div>
   );
 }
