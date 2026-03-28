@@ -7,13 +7,16 @@ import LoginScreen from './components/LoginScreen';
 import TvLobby from './components/TvLobby';
 import QuestionView from './components/QuestionView';
 import Leaderboard from './components/Leaderboard';
+import CountdownScreen from './components/CountdownScreen';
 
 const socket = io('https://trivia-api-z36k.onrender.com'); 
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [venueData, setVenueData] = useState<any>(null);
-  const [screen, setScreen] = useState<'lobby' | 'question' | 'leaderboard' | 'final'>('lobby');
+  const [screen, setScreen] = useState<'lobby' | 'countdown' | 'question' | 'leaderboard' | 'final'>('lobby');
+  const [countdownData, setCountdownData] = useState<{category: string, time: number} | null>(null);
+  
   
   // Game State
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
@@ -23,6 +26,10 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
     supabase.auth.onAuthStateChange((_event, session) => handleSession(session));
+    socket.on('ROUND_STARTING', (data) => {
+    setCountdownData({ category: data.category, time: data.countdown });
+    setScreen('countdown');
+  });
 
     // Socket Listeners
     socket.on('NEW_QUESTION', (data) => {
@@ -82,6 +89,7 @@ function App() {
         {screen === 'question' && <QuestionView question={currentQuestion} />}
         {screen === 'leaderboard' && <Leaderboard leaderboard={leaderboard} correctAnswer={correctAnswer} />}
         {screen === 'final' && <Leaderboard leaderboard={leaderboard} isFinal={true} />}
+        {screen === 'countdown' && countdownData && <CountdownScreen category={countdownData.category} initialTime={countdownData.time} />}
       </main>
       
     </div>

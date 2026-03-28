@@ -17,7 +17,7 @@ export default function LoginScreen() {
     // (Note: Change 5175 to whatever local port Vite is using for your TV app!)
     const redirectUrl = isLocal 
       ? 'http://localhost:5175/' 
-      : 'https://trivia-tv.vercel.app/';
+      : 'https://trivia-tv.vercel.app';
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
